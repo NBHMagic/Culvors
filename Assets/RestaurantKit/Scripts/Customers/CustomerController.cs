@@ -50,8 +50,7 @@ public class CustomerController : MonoBehaviour
     private bool patienceBarSliderFlag;
     internal float leaveTime;
     private float creationTime;
-    private bool isLeaving;
-    
+
     public GameObject money3dText;              //3d text mesh over customers head after successful delivery
 
     //Transforms
@@ -63,6 +62,17 @@ public class CustomerController : MonoBehaviour
     private GameObject target;                  //which plate is nearest? that will be the main target
 
     public CustomerRequestController customerRequestController{get;private set;}
+    public Renderer customerRenderer {get;private set;}
+
+    public State state = State.Init;
+    public enum State
+    {
+        Init,
+        MovingToSeat,
+        Waiting,
+        Leaving,
+        Flying
+    }
     void Awake()
     {
 
@@ -83,10 +93,11 @@ public class CustomerController : MonoBehaviour
         currentCustomerPatience = customerPatience;
         moodIndex = 0;
         leaveTime = 0;
-        isLeaving = false;
+
         creationTime = Time.time;
         startingPosition = transform.position;
-  
+        customerRequestController = GetComponent<CustomerRequestController>();
+        customerRenderer = GetComponentInChildren<MeshRenderer>();
 
     }
 
@@ -108,7 +119,7 @@ public class CustomerController : MonoBehaviour
         customerName = "Customer_" + Random.Range(100, 10000);
         gameObject.name = customerName;
 
-        customerRequestController = GetComponent<CustomerRequestController>();
+        
         customerRequestController.PickCustomerRequest();
     }
 
@@ -121,6 +132,8 @@ public class CustomerController : MonoBehaviour
     private float timeVariance;
     IEnumerator goToSeat()
     {
+        state = State.MovingToSeat;
+
         timeVariance = Random.value;
         
         while (true)
@@ -135,6 +148,7 @@ public class CustomerController : MonoBehaviour
                 customerRequestController.ReachedSeat();
                 patienceBarFG.SetActive(true);
                 patienceBarBG.SetActive(true);
+                state = State.Waiting;
                 break;
             }
             yield return 0;
@@ -217,7 +231,7 @@ public class CustomerController : MonoBehaviour
         }
 
         //check the status of customers with both main order and side-request, and look if they already received both their orders.
-        if (customerRequestController.IsAllRequestsFulfilled && !isLeaving)
+        if (customerRequestController.IsAllRequestsFulfilled && state == State.Waiting)
         {
             settle();
         }
@@ -230,7 +244,7 @@ public class CustomerController : MonoBehaviour
     void updateCustomerMood()
     {
         //if customer has waited for half of his/her patience, make him/her bored.
-        if (!isLeaving)
+        if (state == State.Waiting)
         {
             if (currentCustomerPatience <= customerPatience / 2)
                 moodIndex = 1;
@@ -238,7 +252,7 @@ public class CustomerController : MonoBehaviour
                 moodIndex = 0;
         }
 
-        GetComponent<Renderer>().material = customerMoods[moodIndex];
+        customerRenderer.material = customerMoods[moodIndex];
     }
 
 
@@ -276,13 +290,13 @@ public class CustomerController : MonoBehaviour
         {
             isCloseEnoughToDelivery = true;
             //tint color
-            GetComponent<Renderer>().material.color = new Color(0.5f, 0.5f, 0.5f);
+            customerRenderer.material.color = new Color(0.5f, 0.5f, 0.5f);
         }
         else
         {
             isCloseEnoughToDelivery = false;
             //reset tint color
-            GetComponent<Renderer>().material.color = new Color(1, 1, 1);
+            customerRenderer.material.color = new Color(1, 1, 1);
         }
     }
 
@@ -308,13 +322,13 @@ public class CustomerController : MonoBehaviour
         {
             isCloseEnoughToCandy = true;
             //tint color
-            GetComponent<Renderer>().material.color = new Color(0.5f, 0.5f, 0.5f);
+            customerRenderer.material.color = new Color(0.5f, 0.5f, 0.5f);
         }
         else
         {
             isCloseEnoughToCandy = false;
             //reset tint color
-            GetComponent<Renderer>().material.color = new Color(1, 1, 1);
+            customerRenderer.material.color = new Color(1, 1, 1);
         }
     }
 
@@ -342,13 +356,13 @@ public class CustomerController : MonoBehaviour
         {
             isCloseEnoughToSideRequest = true;
             //tint color
-            GetComponent<Renderer>().material.color = new Color(0.5f, 0.5f, 0.5f);
+            customerRenderer.material.color = new Color(0.5f, 0.5f, 0.5f);
         }
         else
         {
             isCloseEnoughToSideRequest = false;
             //reset tint color
-            GetComponent<Renderer>().material.color = new Color(1, 1, 1);
+            customerRenderer.material.color = new Color(1, 1, 1);
         }
     }
 
@@ -513,12 +527,12 @@ public class CustomerController : MonoBehaviour
     {
 
         //prevent double animation
-        if (isLeaving)
+        if (state != State.Waiting)
             yield break;
+        state = State.Leaving;
 
         //set the leave flag to prevent multiple calls to this function
-        isLeaving = true;
-
+   
         //we need to change the tag of this customer, in order to not be able to receive new deliveries.
         gameObject.tag = "Untagged";
 
